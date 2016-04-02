@@ -8,6 +8,11 @@ import ReactDOMStream from "react-dom-stream/server";
 import RecursiveDivs from "./RecursiveDivs";
 import DynamicRecursiveDivs from "./DynamicRecursiveDivs";
 
+import CacheableComponent from "./CacheableComponent";
+// create a cache that stores 64MB of text.
+import LRURenderCache from "react-dom-stream/lru-render-cache";
+const myCache = LRURenderCache({max: 64 * 1024 * 1024});
+
 var app = express();
 
 // app.use(compression({chunkSize: 1024 * 5, filter:function(req) { return !!(req.query.compress); }}));
@@ -15,7 +20,7 @@ var app = express();
 app.use('/static', express.static('static'));
 
 // =========== raw responses ==============
-// these responses (/string and /stream) just read out from ReactDOM and ReactDOMStream to make it easy to measure 
+// these responses (/string and /stream) just read out from ReactDOM and ReactDOMStream to make it easy to measure
 // TTFB and TTLB. If you want to have a fully functional, connected React page, use /stringClient or /streamClient.
 
 app.get('/string', (req, res) => {
@@ -115,6 +120,17 @@ app.get('/client/stream', async function (req, res) {
     res.end();
   }).pipe(res, {end: false});
 });
+
+app.get('/cache', (req, res) => {
+    var {name = "World"} = req.query;
+    ReactDOMStream.renderToStaticMarkup(<CacheableComponent name={name}/>, {cache: myCache}).pipe(res);
+});
+
+app.get('/cacheString', (req, res) => {
+  var {depth = 1, breadth = 1} = req.query;
+  ReactDOMStream.renderToString(<RecursiveDivs depth={depth} breadth={breadth}/>, {cache: myCache}).pipe(res);
+});
+
 
 var server = app.listen(process.env.PORT, () => {
   var host = server.address().address || "localhost";
